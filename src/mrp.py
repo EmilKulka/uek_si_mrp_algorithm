@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 import src.mps as mps
 import src.bom as bom
@@ -13,6 +15,7 @@ class Mrp:
     def start_algorithm(self):
         bom_data = self.bom.bom_df
         mps_lead_time = 1
+        production_weeks = self.get_production_weeks()
 
         first_level_components = bom_data.query("parent_name == 'none'")
 
@@ -23,19 +26,13 @@ class Mrp:
             component_batch_size = row['batch_size']
             component_mrp_df = self.generate_empty_mrp_df()
 
-            #TODO: move product weeks logic somewhere somehow
-            mps_production_row = self.mps.mps_df.loc['Produkcja']
-            production_weeks = {}
-
-            for week in range(1,10):
-                if mps_production_row[week] > 0:
-                    production_weeks[week + 1] = mps_production_row[week]
-
             for production_week, quantity in production_weeks.items():
                 gross_req_week = production_week - mps_lead_time
 
                 if gross_req_week > 0:
                     component_mrp_df.at['Gross_Requirements', gross_req_week] = quantity
+
+            self.mrp_dfs[component_name] = component_mrp_df
             print(component_mrp_df)
             print(component_name)
 
@@ -43,14 +40,25 @@ class Mrp:
         # print(component_name)
 
 
+
+
+    def get_production_weeks(self) -> dict[int, Any]:
+        mps_production_row = self.mps.mps_df.loc['Produkcja']
+        production_weeks = {}
+
+        for week in range(1, 10):
+            if mps_production_row[week] > 0:
+                production_weeks[week + 1] = mps_production_row[week]
+
+        return production_weeks
     @staticmethod
     def generate_empty_mrp_df() -> pd.DataFrame:
         row_indexes = [
             "Gross_Requirements",
+            "Scheduled_receipts",
             "On_hand",
             "Net_Requirements",
-            "Scheduled_receipts",
-            "Planned_orders_releases"
+            "Planned_orders_releases",
             "Planned_orders_receipts"
         ]
         schema = {
