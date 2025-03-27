@@ -21,7 +21,7 @@ class Mrp:
         mps_lead_time = 1
         first_lvl_comp_production_weeks = self.get_first_lvl_comp_prod_weeks()
 
-        first_level_components = bom_data.query("parent_name == 'none'")
+        first_level_components = bom_data.query("LVL == 1")
 
         for index, row in first_level_components.iterrows():
             component_name = row['component_name']
@@ -42,7 +42,7 @@ class Mrp:
                     component_mrp_df.at['On_hand', week] = left_in_stock
                     component_in_stock= left_in_stock
                 else:
-                    component_mrp_df.at['Net_Requirements', week] = left_in_stock * -1
+                    component_mrp_df.at['Net_Requirements', week] = abs(left_in_stock)
                     planned_order_release_week = week - component_lead_time
                     if planned_order_release_week > 0:
                         component_mrp_df.at['Planned_orders_releases', planned_order_release_week] = component_batch_size
@@ -52,7 +52,7 @@ class Mrp:
                         component_in_stock = left_in_stock
                         component_mrp_df.at['On_hand', week] = left_in_stock
                     else:
-                        raise ValueError("UJEMNY TYDZIEŃ")
+                        raise ValueError("Negative week detected")
 
 
             self.mrp_dfs[component_name] = component_mrp_df
@@ -78,7 +78,7 @@ class Mrp:
 
             if parent_mrp_df is None:
                 print(f"Warning: No MRP data found for parent {parent_name}")
-                continue
+                break
 
             for week in range(1, 11):
                 parent_planned_releases = parent_mrp_df.at['Planned_orders_releases', week]
@@ -104,6 +104,8 @@ class Mrp:
                             component_mrp_df.at['On_hand', week] = left_in_stock
                         else:
                             raise ValueError("Negative week detected")
+                else:
+                    component_mrp_df.at['On_hand', week] = component_in_stock
 
             self.mrp_dfs[component_name] = component_mrp_df
             print(f"MRP for second-level component: {component_name}")
@@ -118,6 +120,7 @@ class Mrp:
                 production_weeks[week + 1] = mps_production_row[week]
 
         return production_weeks
+
     @staticmethod
     def generate_empty_mrp_df() -> pd.DataFrame:
         row_indexes = [
